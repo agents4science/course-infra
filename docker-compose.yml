@@ -1,0 +1,39 @@
+services:
+  gateway:
+    image: ghcr.io/berriai/litellm:main-stable
+    ports:
+      - "127.0.0.1:4000:4000"  # dev: localhost only; production uses TLS + security groups
+    environment:
+      DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD}@db:5432/litellm
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ALCF_API_KEY: ${ALCF_API_KEY:-}
+      ALCF_BASE_URL: ${ALCF_BASE_URL:-http://unset.invalid}
+    volumes:
+      - ./gateway/config.yaml:/app/config.yaml
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: litellm
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+
+# Production (course AWS VM): TLS termination in front of the gateway
+# (Caddy/nginx with certificates), encrypted EBS volumes, and security
+# groups restricting admin ports. See README "Security requirements".

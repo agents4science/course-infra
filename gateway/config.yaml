@@ -1,0 +1,31 @@
+# LiteLLM gateway configuration — two lanes, course defaults.
+# Pin model identifiers to current offerings in sprint 1.
+
+model_list:
+  # ---- commercial frontier lane (default for labs/projects) ----
+  - model_name: frontier-general
+    litellm_params:
+      model: openai/gpt-4o            # placeholder; pin in sprint 1
+      api_key: os.environ/OPENAI_API_KEY
+  - model_name: frontier-reasoning
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  # ---- Argonne lane (open models; red-team week, judging, comparisons) ----
+  - model_name: argonne-general
+    litellm_params:
+      model: openai/SERVED_MODEL_NAME  # ALCF inference service is OpenAI-compatible
+      api_base: os.environ/ALCF_BASE_URL
+      api_key: os.environ/ALCF_API_KEY
+
+litellm_settings:
+  # Trace capture (I4): attach callback in sprint 2
+  # success_callback: ["langfuse"]
+  drop_params: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+  database_url: os.environ/DATABASE_URL
+  # Per-student virtual keys are created by scripts/provision_students.py
+  # with a per-quarter max_budget (hard cap) — the I2 enforcement primitive.

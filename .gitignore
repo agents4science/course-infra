@@ -1,0 +1,6 @@
+.env
+keys.csv
+roster.csv
+*.pyc
+__pycache__/
+pgdata/
