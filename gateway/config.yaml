@@ -12,12 +12,15 @@ model_list:
       model: anthropic/claude-sonnet-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
 
-  # ---- Argonne lane (open models; red-team week, judging, comparisons) ----
-  - model_name: argonne-general
+  # ---- Argonne lane: ALCF Inference Endpoints (open models on lab hardware) ----
+  # OpenAI-compatible; auth = Globus access tokens that EXPIRE (hours).
+  # Run scripts/refresh_alcf_token.py on a cron (every 4h) to keep the lane live.
+  # Served models change; see https://docs.alcf.anl.gov/services/inference-endpoints/
+  - model_name: argonne-gpt-oss-120b
     litellm_params:
-      model: openai/SERVED_MODEL_NAME  # ALCF inference service is OpenAI-compatible
-      api_base: os.environ/ALCF_BASE_URL
-      api_key: os.environ/ALCF_API_KEY
+      model: openai/openai/gpt-oss-120b   # vLLM served-model name, via openai/ provider prefix
+      api_base: os.environ/ALCF_BASE_URL  # e.g. https://inference-api.alcf.anl.gov/resource_server/sophia/vllm/v1
+      api_key: os.environ/ALCF_API_KEY    # Globus access token; rotated by refresher
 
 litellm_settings:
   # Trace capture (I4): attach callback in sprint 2
