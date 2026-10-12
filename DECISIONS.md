@@ -20,7 +20,7 @@ Every request/response pair is captured by gateway callback as JSON (session id,
 
 **Verified against real traffic** (94-call simulated cohort + live ALCF requests): full prompt and response content captured, model/usage/timing attributes present, and per-student identity available in span metadata (`user_api_key_auth_metadata`: name, cohort) — sufficient for in-class autopsies ("show this student's session"). Single-container deployment suits a one-TA operation; Langfuse remains the fallback if quarter use reveals gaps (its deployment is substantially heavier: clickhouse + redis + object store).
 
-**Known gap.** Spans group per request, not per work-session; cross-request session grouping needs a session id passed via request metadata — wire into the starter kit and lab templates (sprint 2).
+**Session grouping (wired 2026-10-12).** Every request carries `metadata: {session_id, student, step}` (plus the OpenAI `user` field), which the gateway propagates into span attributes as `requester_metadata` — verified. Sessions are retrieved in Phoenix by searching/filtering on the session id (e.g., `week1live-diligent-1012-0603`). Remaining: adopt the same convention in the student starter kit and lab templates so student traces group without effort; note Phoenix's native sessions view keys on the OpenInference `session.id` attribute, which LiteLLM does not emit — attribute search is the working mechanism.
 
 ## ADR-4: Sandbox = Docker with resource limits and default-deny networking (accepted)
 
