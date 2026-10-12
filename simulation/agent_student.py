@@ -12,6 +12,7 @@ Reads sim_keys.csv; runs each task in TASKS as a different sim student.
 """
 
 import argparse
+import base64
 import csv
 import json
 import math
@@ -20,6 +21,19 @@ import re
 import time
 
 import requests
+
+PHOENIX_OTLP = os.environ.get("PHOENIX_OTLP", "http://localhost:6006/v1/traces")
+
+from opentelemetry import trace as otel_trace
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+_provider = TracerProvider(resource=Resource.create({"service.name": "sim-students"}))
+_provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter(endpoint=PHOENIX_OTLP)))
+tracer = _provider.get_tracer("agent_student")
+
 
 SYSTEM = """You are an agent that solves tasks step by step using tools.
 Available tools:
@@ -59,9 +73,13 @@ def run_agent(task: str, key: str, model: str, gateway: str,
               max_iters: int = 8) -> str:
     messages = [{"role": "system", "content": SYSTEM},
                 {"role": "user", "content": f"TASK: {task}"}]
+    root = tracer.start_span(session_id)
+    ctx = root.get_span_context()
+    traceparent = f"00-{ctx.trace_id:032x}-{ctx.span_id:016x}-01"
     for i in range(max_iters):
         r = requests.post(f"{gateway}/v1/chat/completions",
-                          headers={"Authorization": f"Bearer {key}"},
+                          headers={"Authorization": f"Bearer {key}",
+                                   "traceparent": traceparent},
                           json={"model": model, "messages": messages,
                                 "max_tokens": 300, "temperature": 0.2,
                                 "user": student,
@@ -76,12 +94,25 @@ def run_agent(task: str, key: str, model: str, gateway: str,
         messages.append({"role": "assistant", "content": reply})
         final = re.search(r"FINAL:\s*(.+)", reply, re.S)
         if final:
-            return f"[{i+1} iters] {final.group(1).strip()[:120]}"
+            result = f"[{i+1} iters] {final.group(1).strip()[:120]}"
+            _close_root(root, session_id, student, task, result)
+            return result
         action = re.search(r"ACTION:\s*(.+)", reply)
         obs = run_tool(action.group(1)) if action else "ERROR: no ACTION or FINAL found; use the required format"
         messages.append({"role": "user", "content": f"OBSERVATION: {obs}"})
         time.sleep(0.5)
-    return f"[cap {max_iters} iters] did not converge (good autopsy material)"
+    result = f"[cap {max_iters} iters] did not converge (good autopsy material)"
+    _close_root(root, session_id, student, task, result)
+    return result
+
+
+def _close_root(root, session_id, student, task, result) -> None:
+    root.set_attribute("openinference.span.kind", "AGENT")
+    root.set_attribute("session.id", session_id)
+    root.set_attribute("user.id", student)
+    root.set_attribute("input.value", task)
+    root.set_attribute("output.value", result)
+    root.end()
 
 
 TASKS = [
