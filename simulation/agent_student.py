@@ -35,6 +35,15 @@ _provider.add_span_processor(SimpleSpanProcessor(OTLPSpanExporter(endpoint=PHOEN
 tracer = _provider.get_tracer("agent_student")
 
 
+SYSTEM_THINKING = """You are an agent that solves tasks step by step using tools.
+Available tools:
+  calc(expression)   - evaluate a Python arithmetic expression (math module allowed)
+  lookup(key)        - look up a constant in the course data table
+EVERY reply must contain exactly two lines:
+  THOUGHT: <one sentence: what you conclude from the last observation and what you will do next>
+  then either  ACTION: <tool>(<argument>)  or  FINAL: <your answer>
+Never skip the THOUGHT line. Begin."""
+
 SYSTEM = """You are an agent that solves tasks step by step using tools.
 Available tools:
   calc(expression)   - evaluate a Python arithmetic expression (math module allowed)
@@ -135,13 +144,19 @@ def main() -> None:
     ap.add_argument("--model", default="argonne-coder")
     ap.add_argument("--gateway", default=os.environ.get("GATEWAY_URL", "http://localhost:4000"))
     ap.add_argument("--keys", default=os.path.join(os.path.dirname(__file__), "sim_keys.csv"))
+    ap.add_argument("--require-thought", action="store_true",
+                    help="protocol variant: mandatory THOUGHT line before every action")
     args = ap.parse_args()
+    global SYSTEM
+    if args.require_thought:
+        SYSTEM = SYSTEM_THINKING
 
     keys = {row["email"]: row["key"] for row in csv.DictReader(open(args.keys))}
     stamp = time.strftime("%m%d-%H%M")
     for email, task in TASKS:
         student = email.split("@")[0]
-        session = f"week1live-{student.removeprefix('sim-')}-{stamp}"
+        prefix = "thoughtful" if args.require_thought else "week1live"
+        session = f"{prefix}-{student.removeprefix('sim-')}-{stamp}"
         print(f"\n=== {email}  [session: {session}]\n    task: {task[:90]}...")
         out = run_agent(task, keys[email], args.model, args.gateway,
                         session_id=session, student=student)
