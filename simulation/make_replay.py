@@ -58,11 +58,16 @@ def build_session(spans, session_prefix):
             "latency": round(float(at.get("response_time", 0) or 0), 2),
             "model": at.get("model", ""),
         })
+    def dig(d, *keys, default=""):
+        for k in keys:
+            d = d.get(k, {}) if isinstance(d, dict) else {}
+        return d if isinstance(d, str) else default
+
     return {
         "session": root["name"],
-        "student": a.get("user.id", "?"),
-        "task": a.get("input.value", ""),
-        "result": a.get("output.value", ""),
+        "student": dig(a, "user", "id", default="?"),
+        "task": dig(a, "input", "value"),
+        "result": dig(a, "output", "value"),
         "steps": steps,
     }
 
