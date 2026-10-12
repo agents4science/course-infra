@@ -19,7 +19,7 @@ bake-offs/projects ──> sandbox runners (containers) ──> gateway
 | Gateway | I1 | **LiteLLM Proxy** (decided; see DECISIONS.md): virtual keys, per-key budgets, routing, callbacks |
 | Budget governor | I2 | LiteLLM budget primitives + policy layer (adapts [Bursar](https://agents4science.github.io/Bursar/) concepts) |
 | Sandbox | I3 | Docker-based execution, resource-limited, default-deny network; MCP-mediated tools |
-| Trace store/viewer | I4 | Gateway callbacks → Postgres + JSONL; viewer via Langfuse or Arize Phoenix (sprint-0 A/B, see DECISIONS.md) |
+| Trace store/viewer | I4 | OTel callback → Phoenix (decided; full content + per-student identity verified); Postgres spend logs; JSONL export for I7 |
 | Oversight dashboard | I5 | v0 = LiteLLM admin UI + trace viewer; custom fleet view later |
 | Bake-off harness | I6 | Existing open eval tooling + task specs (sprint 3) |
 | Consent/redaction | I7 | Post-quarter export pipeline (IRB-gated; session-relative timestamps) |
@@ -52,7 +52,7 @@ A `401` from the Argonne lane means a stale token — run the refresher. Served 
 ## Repository layout
 
 - `gateway/config.yaml` — LiteLLM configuration: model lanes, budgets, logging
-- `docker-compose.yml` — gateway + Postgres (dev); production deploys to the course AWS VM
+- `docker-compose.yml` — gateway + Postgres + Phoenix trace viewer (dev); production deploys to the course AWS VM
 - `scripts/provision_students.py` — create per-student keys with quarter budgets from a roster
 - `DECISIONS.md` — architecture decision records (sprint 0)
 

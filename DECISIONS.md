@@ -14,9 +14,13 @@
 
 Every request/response pair is captured by gateway callback as JSON (session id, event sequence, model, params, token counts, cost, tool metadata, content), stored in Postgres and exportable as JSONL per session. Field names follow OpenTelemetry GenAI / OpenInference conventions where they exist so standard viewers work without translation. The IRB export pipeline (I7) consumes this format; released corpora convert absolute timestamps to session-relative times (IRB commitment).
 
-## ADR-3: Trace viewer — A/B in sprint 2 (open)
+## ADR-3: Trace viewer = Arize Phoenix (accepted 2026-10-12)
 
-Candidates: **Langfuse** (self-hosted; native LiteLLM integration; heavier deployment) vs. **Arize Phoenix** (single container; OpenInference-native; lighter). Decide by running both against real traces in sprint 2. Requirement: good enough to scrub a session live in class during autopsies.
+**Decision.** Phoenix, fed by LiteLLM's OpenTelemetry callback (`callbacks: ["otel"]` → OTLP http → Phoenix).
+
+**Verified against real traffic** (94-call simulated cohort + live ALCF requests): full prompt and response content captured, model/usage/timing attributes present, and per-student identity available in span metadata (`user_api_key_auth_metadata`: name, cohort) — sufficient for in-class autopsies ("show this student's session"). Single-container deployment suits a one-TA operation; Langfuse remains the fallback if quarter use reveals gaps (its deployment is substantially heavier: clickhouse + redis + object store).
+
+**Known gap.** Spans group per request, not per work-session; cross-request session grouping needs a session id passed via request metadata — wire into the starter kit and lab templates (sprint 2).
 
 ## ADR-4: Sandbox = Docker with resource limits and default-deny networking (accepted)
 

@@ -11,12 +11,23 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ALCF_API_KEY: ${ALCF_API_KEY:-}
       ALCF_BASE_URL: ${ALCF_BASE_URL:-http://unset.invalid}
+      OTEL_EXPORTER: otlp_http
+      OTEL_ENDPOINT: http://phoenix:6006/v1/traces
     volumes:
       - ./gateway/config.yaml:/app/config.yaml
     command: ["--config", "/app/config.yaml", "--port", "4000"]
     depends_on:
       db:
         condition: service_healthy
+      phoenix:
+        condition: service_started
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "127.0.0.1:6006:6006"   # UI + OTLP http; localhost only in dev
+    volumes:
+      - phoenixdata:/mnt/data
 
   db:
     image: postgres:16
@@ -34,6 +45,7 @@ services:
 
 volumes:
   pgdata:
+  phoenixdata:
 
 # Production (course AWS VM): TLS termination in front of the gateway
 # (Caddy/nginx with certificates), encrypted EBS volumes, and security
