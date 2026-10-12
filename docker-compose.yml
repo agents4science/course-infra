@@ -24,6 +24,8 @@ services:
 
   phoenix:
     image: arizephoenix/phoenix:latest
+    environment:
+      PHOENIX_WORKING_DIR: /mnt/data   # persist traces to the volume
     ports:
       - "127.0.0.1:6006:6006"   # UI + OTLP http; localhost only in dev
     volumes:
