@@ -22,6 +22,13 @@ model_list:
       api_base: os.environ/ALCF_BASE_URL  # e.g. https://inference-api.alcf.anl.gov/resource_server/sophia/vllm/v1
       api_key: os.environ/ALCF_API_KEY    # Globus access token; rotated by refresher
 
+  # ---- simulation lane: mock model for keyless infra testing ----
+  - model_name: sim-mock
+    litellm_params:
+      model: openai/mock-model
+      api_key: "sk-mock"
+      mock_response: "SIMULATED RESPONSE: plan step completed; proceeding to next action."
+
 litellm_settings:
   # Trace capture (I4): attach callback in sprint 2
   # success_callback: ["langfuse"]

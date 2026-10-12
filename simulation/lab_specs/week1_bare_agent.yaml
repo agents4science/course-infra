@@ -1,0 +1,13 @@
+# Lab spec: week 1 — build and exercise a bare agent loop.
+# Doubles as the real lab definition; in simulation, sim students execute
+# the *behavioral* profile (a multi-turn session shaped like doing this lab).
+
+id: week1_bare_agent
+title: "Build a bare agent loop"
+model: sim-mock            # switch to frontier-general / argonne-* for live runs
+session_turns:
+  - "You are my coding assistant. I'm building a minimal agent loop in Python: model call, parse a tool request, dispatch, loop. Outline the structure."
+  - "Here is my draft loop. The tool-call parsing fails on nested JSON. Help me fix it."
+  - "Now add a calculator tool and show a full working example."
+  - "My loop never terminates when the model doesn't request a tool. What stop condition should I use?"
+success_signal: "any non-error completion for all turns"

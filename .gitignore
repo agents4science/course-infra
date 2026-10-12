@@ -4,3 +4,6 @@ roster.csv
 *.pyc
 __pycache__/
 pgdata/
+sim_keys.csv
+sim_roster.csv
+last_run.json

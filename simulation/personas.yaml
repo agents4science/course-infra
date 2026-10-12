@@ -1,0 +1,36 @@
+# Simulated-student personas. Each gets a real gateway key (cohort sim-2026)
+# and drives lab specs through the production stack. Behavior knobs stress
+# different instruments: budgets (I2), error paths (I1), oversight (I5).
+
+personas:
+  - id: sim-diligent
+    style: "follows instructions carefully, moderate usage"
+    calls_per_lab: 12
+    prompt_tokens: short
+    pacing_s: 2.0
+  - id: sim-minimal
+    style: "does the least that satisfies the spec"
+    calls_per_lab: 4
+    prompt_tokens: short
+    pacing_s: 3.0
+  - id: sim-verbose
+    style: "pastes huge context into every prompt"
+    calls_per_lab: 10
+    prompt_tokens: long
+    pacing_s: 2.0
+  - id: sim-burst
+    style: "rapid-fire requests, no pacing (rate-limit stressor)"
+    calls_per_lab: 20
+    prompt_tokens: short
+    pacing_s: 0.0
+  - id: sim-burner
+    style: "loops without converging (budget stressor)"
+    calls_per_lab: 40
+    prompt_tokens: medium
+    pacing_s: 0.2
+  - id: sim-flaky
+    style: "malformed requests, wrong model names (error-path stressor)"
+    calls_per_lab: 8
+    prompt_tokens: short
+    pacing_s: 1.0
+    error_rate: 0.5
