@@ -54,14 +54,22 @@ def run_tool(call: str) -> str:
     return f"ERROR: unknown tool '{tool}'"
 
 
-def run_agent(task: str, key: str, model: str, gateway: str, max_iters: int = 8) -> str:
+def run_agent(task: str, key: str, model: str, gateway: str,
+              session_id: str = "adhoc", student: str = "unknown",
+              max_iters: int = 8) -> str:
     messages = [{"role": "system", "content": SYSTEM},
                 {"role": "user", "content": f"TASK: {task}"}]
     for i in range(max_iters):
         r = requests.post(f"{gateway}/v1/chat/completions",
                           headers={"Authorization": f"Bearer {key}"},
                           json={"model": model, "messages": messages,
-                                "max_tokens": 300, "temperature": 0.2},
+                                "max_tokens": 300, "temperature": 0.2,
+                                "user": student,
+                                # lands in span attrs as metadata.requester_metadata:
+                                # search/filter traces by session in Phoenix
+                                "metadata": {"session_id": session_id,
+                                             "student": student,
+                                             "step": i + 1}},
                           timeout=120)
         r.raise_for_status()
         reply = r.json()["choices"][0]["message"]["content"].strip()
@@ -99,9 +107,13 @@ def main() -> None:
     args = ap.parse_args()
 
     keys = {row["email"]: row["key"] for row in csv.DictReader(open(args.keys))}
+    stamp = time.strftime("%m%d-%H%M")
     for email, task in TASKS:
-        print(f"\n=== {email}\n    task: {task[:90]}...")
-        out = run_agent(task, keys[email], args.model, args.gateway)
+        student = email.split("@")[0]
+        session = f"week1live-{student.removeprefix('sim-')}-{stamp}"
+        print(f"\n=== {email}  [session: {session}]\n    task: {task[:90]}...")
+        out = run_agent(task, keys[email], args.model, args.gateway,
+                        session_id=session, student=student)
         print(f"    result: {out}")
 
 
