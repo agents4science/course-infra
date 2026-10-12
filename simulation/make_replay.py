@@ -51,6 +51,8 @@ def build_session(spans, session_prefix):
         reply = choices[0]["message"]["content"] if choices else ""
         steps.append({
             "incoming": incoming, "reply": reply,
+            "messages": [{"role": m.get("role", "?"),
+                          "content": str(m.get("content", ""))} for m in msgs],
             "tin": usage.get("prompt_tokens", 0),
             "tout": usage.get("completion_tokens", 0),
             "latency": round(float(at.get("response_time", 0) or 0), 2),
@@ -81,6 +83,10 @@ h1{font-size:1.2rem} .meta{color:#6B7280;font-size:.9rem;margin-bottom:.4rem}
 button,select{font:inherit;padding:.25rem .8rem}
 #verdict{display:none;background:#EEF2F6;border:2px solid #1F3B5C;border-radius:8px;padding:.8rem 1rem;margin:1.2rem 0;font-weight:bold}
 .cursor::after{content:"▋";animation:blink 1s infinite}@keyframes blink{50%{opacity:0}}
+details{margin-top:.45rem;font-size:.82rem}summary{cursor:pointer;color:#4A7BA6;font-family:Menlo,monospace}
+.msg{border-left:3px solid #d7dee6;margin:.4rem 0;padding:.3rem .6rem;white-space:pre-wrap;font-family:Menlo,monospace;font-size:.78rem;background:#fff}
+.msg .role{font-weight:bold;color:#4A7BA6;display:block;margin-bottom:.15rem;text-transform:uppercase;font-size:.7rem}
+.msg.system{border-color:#E8A33D}.msg.assistant{border-color:#1F3B5C}.msg.user{border-color:#4A7BA6}
 </style></head><body>
 <div id="bar"><button id="play">▶ Play</button>
 <select id="speed"><option value="1">1×</option><option value="4" selected>4×</option><option value="16">16×</option></select>
@@ -111,6 +117,17 @@ async function run(){
   requestAnimationFrame(()=>d.classList.add('on'));
   await sleep(Math.min(st.latency*1000,3000)/sp());
   await typewrite(rp,st.reply,60*sp());
+  const det=document.createElement('details');
+  const sum=document.createElement('summary');
+  sum.textContent=`full LLM call — ${st.messages.length} messages sent, ${st.tin} tokens in`;
+  det.append(sum);
+  st.messages.forEach(m=>{const b=document.createElement('div');b.className='msg '+m.role;
+   const r=document.createElement('span');r.className='role';r.textContent=m.role;
+   b.append(r,document.createTextNode(m.content));det.append(b);});
+  const rb=document.createElement('div');rb.className='msg assistant';
+  const rl=document.createElement('span');rl.className='role';rl.textContent='assistant (response)';
+  rb.append(rl,document.createTextNode(st.reply));det.append(rb);
+  d.append(det);
   tok+=st.tin+st.tout;cost+=st.tin*IN_RATE+st.tout*OUT_RATE;
   document.getElementById('mstep').textContent=i+1;
   document.getElementById('mtok').textContent=tok;
