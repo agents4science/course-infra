@@ -24,10 +24,17 @@ ALCF_BASE = os.environ.get(
     "ALCF_BASE_URL",
     "https://inference-api.alcf.anl.gov/resource_server/sophia/vllm/v1")
 
-# Lane models: gateway alias -> served-model name on the ALCF service.
+# Lane models: gateway alias -> served-model name + shadow pricing ($/M tokens).
+# ALCF inference is free to the course, but usage is PRICED against student
+# budgets (policy decision 2026-10-12: cost-awareness applies on every lane;
+# Argonne lane priced ~half of frontier so the tradeoff is real, not zero).
 # Keep aliases stable; update served names as the ALCF catalog changes.
 LANE = {
-    "argonne-coder": "Qwen3-Coder-480B-A35B-Instruct-AWQ",  # verified running 2026-10-12
+    "argonne-coder": {
+        "served": "Qwen3-Coder-480B-A35B-Instruct-AWQ",  # verified running 2026-10-12
+        "input_per_m": 0.25,
+        "output_per_m": 1.00,
+    },
 }
 
 
@@ -56,17 +63,20 @@ def main() -> None:
             if r.status_code == 200:
                 print(f"deleted stale deployment {m['model_name']} ({mid[:8]})")
 
-    for alias, served in LANE.items():
+    for alias, spec in LANE.items():
         r = requests.post(f"{GATEWAY}/model/new", headers=hdr, json={
             "model_name": alias,
             "litellm_params": {
-                "model": f"openai/{served}",
+                "model": f"openai/{spec['served']}",
                 "api_base": ALCF_BASE,
                 "api_key": token,
+                "input_cost_per_token": spec["input_per_m"] / 1e6,
+                "output_cost_per_token": spec["output_per_m"] / 1e6,
             },
         }, timeout=30)
         r.raise_for_status()
-        print(f"created {alias} -> {served} with fresh token")
+        print(f"created {alias} -> {spec['served']} "
+              f"(${spec['input_per_m']}/M in, ${spec['output_per_m']}/M out)")
 
 
 if __name__ == "__main__":
