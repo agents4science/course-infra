@@ -1,0 +1,23 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pyyaml requests
+      - name: Python syntax
+        run: python -m py_compile scripts/*.py simulation/*.py
+      - name: YAML validity
+        run: |
+          python - << 'PY'
+          import glob, yaml
+          for f in glob.glob('**/*.yaml', recursive=True) + glob.glob('**/*.yml', recursive=True):
+              yaml.safe_load(open(f)); print('ok', f)
+          PY
+      - name: Compose config
+        run: |
+          cp .env.example .env
+          docker compose config -q
