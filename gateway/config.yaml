@@ -16,11 +16,11 @@ model_list:
   # OpenAI-compatible; auth = Globus access tokens that EXPIRE (hours).
   # Run scripts/refresh_alcf_token.py on a cron (every 4h) to keep the lane live.
   # Served models change; see https://docs.alcf.anl.gov/services/inference-endpoints/
-  - model_name: argonne-gpt-oss-120b
-    litellm_params:
-      model: openai/openai/gpt-oss-120b   # vLLM served-model name, via openai/ provider prefix
-      api_base: os.environ/ALCF_BASE_URL  # e.g. https://inference-api.alcf.anl.gov/resource_server/sophia/vllm/v1
-      api_key: os.environ/ALCF_API_KEY    # Globus access token; rotated by refresher
+  # NOTE: Argonne-lane models are NOT defined here. Globus tokens expire and
+  # config-file models cannot be updated via the admin API, so the lane is
+  # DB-managed: scripts/refresh_alcf_token.py creates and rotates the
+  # deployments. Catalog: GET /resource_server/list-endpoints; running jobs:
+  # /resource_server/sophia/jobs (non-running models cold-start via PBS).
 
   # ---- simulation lane: mock model for keyless infra testing ----
   - model_name: sim-mock

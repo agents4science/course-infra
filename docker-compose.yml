@@ -6,6 +6,7 @@ services:
     environment:
       DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD}@db:5432/litellm
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      STORE_MODEL_IN_DB: "True"   # Argonne lane is DB-managed (token rotation)
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ALCF_API_KEY: ${ALCF_API_KEY:-}

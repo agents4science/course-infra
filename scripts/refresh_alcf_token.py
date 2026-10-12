@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Refresh the Argonne-lane Globus token in the running gateway.
+"""Create/rotate the Argonne-lane models in the running gateway.
 
-ALCF Inference Endpoints use Globus access tokens that expire after hours.
-This script (1) obtains a fresh token via the alcf-ai CLI (requires one-time
-interactive `alcf-ai auth login` by the operator), then (2) updates every
-gateway model deployment whose api_base points at the ALCF service.
+ALCF Inference Endpoints use Globus access tokens that expire after hours,
+and LiteLLM config-file models cannot be updated via the admin API --- so the
+Argonne lane is DB-managed: this script deletes any existing ALCF-lane
+deployments and recreates them with a fresh token. Run once to create the
+lane, then from cron (e.g. every 4h) to keep it live.
 
-Run from cron, e.g.:  0 */4 * * *  .../refresh_alcf_token.py
-
-Env: LITELLM_MASTER_KEY, GATEWAY_URL (default http://localhost:4000)
+Requires one-time interactive `uvx --from alcf-ai alcf-ai auth login`.
+Env: LITELLM_MASTER_KEY, GATEWAY_URL (default http://localhost:4000),
+     ALCF_BASE_URL (default Sophia vLLM endpoint)
 """
 
 import os
@@ -19,16 +20,24 @@ import requests
 
 GATEWAY = os.environ.get("GATEWAY_URL", "http://localhost:4000")
 ALCF_HOST = "inference-api.alcf.anl.gov"
+ALCF_BASE = os.environ.get(
+    "ALCF_BASE_URL",
+    "https://inference-api.alcf.anl.gov/resource_server/sophia/vllm/v1")
+
+# Lane models: gateway alias -> served-model name on the ALCF service.
+# Keep aliases stable; update served names as the ALCF catalog changes.
+LANE = {
+    "argonne-coder": "Qwen3-Coder-480B-A35B-Instruct-AWQ",  # verified running 2026-10-12
+}
 
 
 def fresh_token() -> str:
     out = subprocess.run(
         ["uvx", "--from", "alcf-ai", "alcf-ai", "auth", "get-access-token"],
-        capture_output=True, text=True, check=True,
-    )
-    token = out.stdout.strip()
+        capture_output=True, text=True, check=True)
+    token = out.stdout.strip().splitlines()[-1]
     if not token:
-        sys.exit("alcf-ai returned empty token; run `alcf-ai auth login` once interactively")
+        sys.exit("empty token; run `alcf-ai auth login` once interactively")
     return token
 
 
@@ -39,22 +48,25 @@ def main() -> None:
 
     info = requests.get(f"{GATEWAY}/model/info", headers=hdr, timeout=30)
     info.raise_for_status()
-    updated = 0
     for m in info.json()["data"]:
-        base = (m.get("litellm_params") or {}).get("api_base") or ""
-        if ALCF_HOST in base:
-            resp = requests.post(
-                f"{GATEWAY}/model/update",
-                headers=hdr,
-                json={"model_id": m["model_info"]["id"],
-                      "litellm_params": {**m["litellm_params"], "api_key": token}},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            updated += 1
-            print(f"refreshed token for {m['model_name']}")
-    if updated == 0:
-        print("no ALCF-lane models found in gateway (check api_base config)")
+        if ALCF_HOST in str((m.get("litellm_params") or {}).get("api_base") or ""):
+            mid = m["model_info"]["id"]
+            r = requests.post(f"{GATEWAY}/model/delete", headers=hdr,
+                              json={"id": mid}, timeout=30)
+            if r.status_code == 200:
+                print(f"deleted stale deployment {m['model_name']} ({mid[:8]})")
+
+    for alias, served in LANE.items():
+        r = requests.post(f"{GATEWAY}/model/new", headers=hdr, json={
+            "model_name": alias,
+            "litellm_params": {
+                "model": f"openai/{served}",
+                "api_base": ALCF_BASE,
+                "api_key": token,
+            },
+        }, timeout=30)
+        r.raise_for_status()
+        print(f"created {alias} -> {served} with fresh token")
 
 
 if __name__ == "__main__":

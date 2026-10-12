@@ -40,12 +40,12 @@ Students then point any OpenAI-compatible client at `https://<gateway-host>/v1` 
 
 ## Enabling the Argonne lane (ALCF Inference Endpoints)
 
-Agents can route to open models served on ALCF hardware by requesting Argonne-lane model names (e.g., `argonne-gpt-oss-120b`) through the same gateway and the same student key — students never handle Globus credentials. Setup (operator, once):
+Agents can route to open models served on ALCF hardware by requesting Argonne-lane model names (e.g., `argonne-coder`) through the same gateway and the same student key — students never handle Globus credentials. Setup (operator, once):
 
 1. Prerequisite: an ALCF account with an allocation covering the inference service (for the class: the project-level service credential — see the instrument plan's accounts section).
 2. One-time interactive login: `uvx --from alcf-ai alcf-ai auth login`
 3. Set `ALCF_BASE_URL` in `.env` (e.g., the Sophia vLLM endpoint: `https://inference-api.alcf.anl.gov/resource_server/sophia/vllm/v1`).
-4. Cron the token refresher (Globus access tokens expire after hours): `0 */4 * * * LITELLM_MASTER_KEY=... scripts/refresh_alcf_token.py`
+4. Run the lane manager once to create the lane, then cron it (Globus access tokens expire after hours): `0 */4 * * * LITELLM_MASTER_KEY=... scripts/refresh_alcf_token.py`. The lane is DB-managed (`STORE_MODEL_IN_DB=True` in compose) because config-file models cannot be token-rotated via the admin API; the script deletes stale deployments and recreates them with a fresh token, with no gateway restart.
 
 A `401` from the Argonne lane means a stale token — run the refresher. Served model list changes; check the [ALCF inference docs](https://docs.alcf.anl.gov/services/inference-endpoints/) and add entries to `gateway/config.yaml` accordingly. Lane roles (red-team week, bulk judging, open-vs-frontier comparisons) are defined in the [instrument plan](https://agents4science.github.io/2027/instruments.html).
 
