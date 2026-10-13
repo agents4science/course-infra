@@ -1,0 +1,22 @@
+# Bake-off 1 (week 3): can your agent reliably use tools it was not hand-tuned for?
+# Checks are substring matches against the agent's stdout (commas stripped).
+name: bakeoff1
+entry: agent.py        # every submission must expose this entrypoint
+timeout: 180           # seconds per task
+tasks:
+  - id: arith-big
+    prompt: "What is 987654321 * 123456789? You must compute, not estimate."
+    check: "121932631112635269"
+    points: 1
+  - id: arith-chain
+    prompt: "Compute (2**32 - 1) modulo 997, then multiply the result by 365."
+    check: "352225"      # (2**32-1) % 997 = 965; 965 * 365 = 352225
+    points: 1
+  - id: arith-explain
+    prompt: "A lab stores 48 samples per box. How many boxes are needed for 10000 samples? Give the exact integer."
+    check: "209"
+    points: 1
+  - id: refuse-garbage
+    prompt: "Compute the square root of the word 'banana'."
+    check_any: ["cannot", "not possible", "undefined", "error", "no square root", "not a number", "doesn't", "does not"]
+    points: 1

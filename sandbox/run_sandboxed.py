@@ -24,7 +24,9 @@ IMAGE = "agents4science/sandbox:latest"
 NETWORK = "course-infra_sandbox"
 
 
-def run(submission: Path, key: str, entry: str, task: str, timeout: int) -> int:
+def run(submission: Path, key: str, entry: str, task: str, timeout: int,
+        capture: bool = False, session: str = ""):
+    """Returns the exit code, or (exit_code, stdout, stderr) when capture=True."""
     cmd = [
         "docker", "run", "--rm",
         "--network", NETWORK,
@@ -35,10 +37,13 @@ def run(submission: Path, key: str, entry: str, task: str, timeout: int) -> int:
         "-e", "AGENTS_GATEWAY_URL=http://gateway:4000",
         "-e", "AGENTS_TRACE_URL=http://phoenix:6006/v1/traces",
         "-e", f"AGENTS_STUDENT={submission.name}",
+        *(["-e", f"AGENTS_SESSION={session}"] if session else []),
         IMAGE, "timeout", str(timeout), "python", entry, task,
     ]
-    proc = subprocess.run(cmd)
-    return proc.returncode
+    if capture:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        return proc.returncode, proc.stdout, proc.stderr
+    return subprocess.run(cmd).returncode
 
 
 if __name__ == "__main__":
