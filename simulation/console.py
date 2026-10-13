@@ -14,6 +14,8 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import requests
+
 import agent_student
 import make_replay
 
@@ -75,6 +77,42 @@ def get_session(name):
             "done": info.get("done", False) and True}
 
 
+def budgets():
+    """Fleet budget view: spend vs cap per key (instructor; needs master key)."""
+    master = os.environ.get("LITELLM_MASTER_KEY")
+    if not master:
+        return []
+    out, page = [], 1
+    while True:
+        r = requests.get(f"{GATEWAY}/key/list",
+                         params={"return_full_object": "true", "page": page, "size": 100},
+                         headers={"Authorization": f"Bearer {master}"}, timeout=15)
+        r.raise_for_status()
+        batch = r.json().get("keys", [])
+        for k in batch:
+            if k.get("max_budget"):
+                out.append({"student": k.get("key_alias") or k["key_name"],
+                            "spend": round(float(k.get("spend") or 0), 4),
+                            "cap": k["max_budget"],
+                            "blocked": bool(k.get("blocked"))})
+        if len(batch) < 100:
+            break
+        page += 1
+    return sorted(out, key=lambda r: -r["spend"] / r["cap"])
+
+
+def key_usage(key):
+    """Self-service usage: a key querying its own info (no master key involved)."""
+    r = requests.get(f"{GATEWAY}/key/info",
+                     headers={"Authorization": f"Bearer {key}"}, timeout=10)
+    if r.status_code != 200:
+        return {"error": "key not recognized"}
+    i = r.json()["info"]
+    return {"student": i.get("key_alias") or "?",
+            "spend": round(float(i.get("spend") or 0), 4),
+            "cap": i.get("max_budget")}
+
+
 def launch(student, task, model):
     stamp = time.strftime("%m%d-%H%M%S")
     session = f"console-{student.removeprefix('sim-')}-{stamp}"
@@ -116,6 +154,15 @@ class H(BaseHTTPRequestHandler):
             self._json(get_session(self.path.split("/api/session/", 1)[1]))
         elif self.path == "/api/students":
             self._json(sorted(KEYS))
+        elif self.path == "/api/budgets":
+            self._json(budgets())
+        elif self.path == "/usage":
+            body = USAGE_PAGE.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         else:
             self._json({"error": "not found"}, 404)
 
@@ -125,6 +172,10 @@ class H(BaseHTTPRequestHandler):
             req = json.loads(self.rfile.read(n))
             session = launch(req["student"], req["task"], req.get("model", "argonne-coder"))
             self._json({"session": session})
+        elif self.path == "/api/usage":
+            n = int(self.headers.get("Content-Length", 0))
+            req = json.loads(self.rfile.read(n))
+            self._json(key_usage(req.get("key", "")))
         else:
             self._json({"error": "not found"}, 404)
 
@@ -164,6 +215,8 @@ details{margin-top:.4rem;font-size:.8rem}summary{cursor:pointer;color:#4A7BA6;fo
   <button id="runbtn">▶ Run live</button>
   <h2>Sessions <button id="rf" style="width:auto;padding:.1rem .5rem;font-size:.75rem">↻</button></h2>
   <div id="list"></div>
+  <h2>Budgets</h2>
+  <div id="budgets" style="font-size:.75rem;font-family:Menlo,monospace"></div>
 </div>
 <div id="right">
   <div id="meters">step <span id="mstep">0</span> · <span id="mtok">0</span> tok · $<span id="mcost">0.000000</span> <span id="livebadge">● LIVE</span></div>
@@ -225,8 +278,43 @@ $('rf').onclick=loadSessions;
 $('runbtn').onclick=async()=>{const body={student:$('student').value,model:$('model').value,task:$('taskin').value};
  const r=await fetch('/api/run',{method:'POST',body:JSON.stringify(body)});
  const {session}=await r.json();await loadSessions();play(session,body.task,true);};
+async function loadBudgets(){const r=await fetch('/api/budgets');const bs=await r.json();
+ $('budgets').innerHTML='';bs.forEach(b=>{
+  const pct=Math.min(100,100*b.spend/b.cap);
+  const tier=pct>=95?'#D1495B':pct>=80?'#E8A33D':'#4A7BA6';
+  const d=document.createElement('div');d.style.margin='.3rem 0';
+  d.innerHTML='<div></div><div style="background:#d7dee6;border-radius:3px;height:6px">'+
+   '<div style="height:6px;border-radius:3px;width:'+Math.max(pct,1)+'%;background:'+tier+'"></div></div>';
+  d.firstChild.textContent=b.student.split('@')[0]+'  $'+b.spend.toFixed(2)+' / $'+b.cap+(b.blocked?'  BLOCKED':'');
+  $('budgets').append(d);});}
 fetch('/api/students').then(r=>r.json()).then(ss=>{ss.forEach(s=>{const o=document.createElement('option');o.textContent=s;$('student').append(o);});});
-loadSessions();
+loadSessions();loadBudgets();setInterval(loadBudgets,30000);
+</script></body></html>"""
+
+USAGE_PAGE = r"""<!doctype html><html><head><meta charset="utf-8"><title>my usage</title><style>
+body{font-family:Georgia,serif;background:#f6f8fa;color:#1F3B5C;max-width:28rem;margin:4rem auto;padding:0 1rem}
+input,button{font:inherit;width:100%;box-sizing:border-box;margin:.3rem 0;padding:.5rem}
+button{background:#1F3B5C;color:#fff;border:none;border-radius:5px;cursor:pointer}
+#out{margin-top:1.5rem;font-size:1.05rem}
+#bar{background:#d7dee6;border-radius:4px;height:14px;margin:.6rem 0}
+#fill{height:14px;border-radius:4px;background:#4A7BA6;width:0}
+</style></head><body>
+<h1 style="font-size:1.3rem">CMSC 35370 — my usage</h1>
+<p>Paste your gateway key. It is checked against the gateway directly and shows only your own account.</p>
+<input id="key" type="password" placeholder="sk-...">
+<button onclick="go()">Show my usage</button>
+<div id="out"></div><div id="bar" style="display:none"><div id="fill"></div></div>
+<script>
+async function go(){
+ const r=await fetch('/api/usage',{method:'POST',body:JSON.stringify({key:document.getElementById('key').value.trim()})});
+ const d=await r.json();const out=document.getElementById('out');
+ if(d.error){out.textContent=d.error;return;}
+ const pct=d.cap?Math.min(100,100*d.spend/d.cap):0;
+ out.innerHTML='';const b=document.createElement('b');b.textContent=d.student;
+ out.append(b,document.createTextNode(' — $'+d.spend.toFixed(2)+' of $'+d.cap+' ('+pct.toFixed(1)+'%)'));
+ document.getElementById('bar').style.display='block';
+ const f=document.getElementById('fill');f.style.width=Math.max(pct,1)+'%';
+ f.style.background=pct>=95?'#D1495B':pct>=80?'#E8A33D':'#4A7BA6';}
 </script></body></html>"""
 
 
