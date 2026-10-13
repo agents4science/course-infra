@@ -26,6 +26,8 @@ Every request/response pair is captured by gateway callback as JSON (session id,
 
 Labs: students run the course sandbox image locally (week-0 setup installs Docker). Bake-offs and projects: the course sandbox service on the AWS VM runs submissions in containers with CPU/memory/time limits and no network by default, with allow-listed egress (gateway + specific data hosts) when a task requires it. Firecracker/gVisor deferred; plain Docker with hard limits fits the course threat model — revisit if red-team week says otherwise.
 
+Implemented 2026-10-13: `sandbox/Dockerfile` (python:3.12-slim + course_kit from the agent-starter repo, unprivileged user) and `sandbox/run_sandboxed.py` (1 CPU / 1 GB / 256 pids / read-only mount / timeout; joins the compose `sandbox` network, which is `internal: true`, so only gateway and Phoenix are reachable — egress verified blocked). Key is injected as env, never on disk.
+
 ## ADR-5: Hosting = AWS via UChicago enterprise agreement (decided 2026-10-11)
 
 One always-on instance (gateway, Postgres, viewer, dashboards) plus burst capacity for sandbox runners. Security configuration per the IRB commitments (see README).

@@ -16,6 +16,7 @@ services:
     volumes:
       - ./gateway/config.yaml:/app/config.yaml
     command: ["--config", "/app/config.yaml", "--port", "4000"]
+    networks: [default, sandbox]
     depends_on:
       db:
         condition: service_healthy
@@ -30,6 +31,7 @@ services:
       - "127.0.0.1:6006:6006"   # UI + OTLP http; localhost only in dev
     volumes:
       - phoenixdata:/mnt/data
+    networks: [default, sandbox]
 
   db:
     image: postgres:16
@@ -48,6 +50,11 @@ services:
 volumes:
   pgdata:
   phoenixdata:
+
+networks:
+  default:
+  sandbox:
+    internal: true   # submissions can reach gateway + phoenix, nothing else
 
 # Production (course AWS VM): TLS termination in front of the gateway
 # (Caddy/nginx with certificates), encrypted EBS volumes, and security
