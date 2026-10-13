@@ -8,3 +8,5 @@ sim_keys.csv
 sim_roster.csv
 last_run.json
 replay_*.html
+export/.salt
+bakeoff_results/
